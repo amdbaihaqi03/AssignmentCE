@@ -1,149 +1,158 @@
-import csv
 import streamlit as st
+import csv
+import random
+import pandas as pd
 
+# ===================== STEP 1: READ CSV (AUTO LOAD) =====================
 
-uploaded_file = st.file_uploader("Upload your CSV file", type=['csv'])
-# Function to read the CSV file and convert it to the desired format
-def read_csv_to_dict(file):
+def read_csv_to_dict(file_path):
     program_ratings = {}
-    reader = csv.reader(file.read().decode('utf-8').splitlines())
-    header = next(reader)
-    for row in reader:
-        program = row[0]
-        ratings = [float(x) for x in row[1:]]
-        program_ratings[program] = ratings
+    try:
+        with open(file_path, mode='r', newline='') as file:
+            reader = csv.reader(file)
+            header = next(reader)  # skip header
+            for row in reader:
+                program = row[0]
+                ratings = [float(x) if x else 0.0 for x in row[1:]]
+                program_ratings[program] = ratings
+    except FileNotFoundError:
+        st.error("❌ File 'program_ratings_modified.csv' not found. Please make sure it’s in the same folder as this app.")
     return program_ratings
 
-if uploaded_file is not None:
-    program_ratings_dict = read_csv_to_dict(uploaded_file)
-    st.success("CSV loaded successfully!")
-    st.write(program_ratings_dict)
-else:
-    st.warning("Please upload a CSV file to continue.")
 
-##################################### DEFINING PARAMETERS AND DATASET ################################################################
-# Sample rating programs dataset for each time slot.
-ratings = program_ratings_dict
+# ===================== STEP 2: GENETIC ALGORITHM FUNCTIONS =====================
 
-GEN = 100
-POP = 50
-CO_R = 0.8
-MUT_R = 0.2
-EL_S = 2
-
-all_programs = list(ratings.keys()) # all programs
-all_time_slots = list(range(6, 24)) # time slots
-
-######################################### DEFINING FUNCTIONS ########################################################################
-# defining fitness function
-def fitness_function(schedule):
+def fitness_function(schedule, ratings):
     total_rating = 0
     for time_slot, program in enumerate(schedule):
-        total_rating += ratings[program][time_slot]
+        if program in ratings and time_slot < len(ratings[program]):
+            total_rating += ratings[program][time_slot]
     return total_rating
 
-# initializing the population
-def initialize_pop(programs, time_slots):
-    if not programs:
-        return [[]]
 
-    all_schedules = []
-    for i in range(len(programs)):
-        for schedule in initialize_pop(programs[:i] + programs[i + 1:], time_slots):
-            all_schedules.append([programs[i]] + schedule)
-
-    return all_schedules
-
-# selection
-def finding_best_schedule(all_schedules):
-    best_schedule = []
-    max_ratings = 0
-
-    for schedule in all_schedules:
-        total_ratings = fitness_function(schedule)
-        if total_ratings > max_ratings:
-            max_ratings = total_ratings
-            best_schedule = schedule
-
-    return best_schedule
-
-# calling the pop func.
-all_possible_schedules = initialize_pop(all_programs, all_time_slots)
-
-# callin the schedule func.
-best_schedule = finding_best_schedule(all_possible_schedules)
+def initialize_population(programs, pop_size):
+    population = []
+    for _ in range(pop_size):
+        schedule = programs.copy()
+        random.shuffle(schedule)
+        population.append(schedule)
+    return population
 
 
-############################################# GENETIC ALGORITHM #############################################################################
-
-# Crossover
 def crossover(schedule1, schedule2):
-    crossover_point = random.randint(1, len(schedule1) - 2)
-    child1 = schedule1[:crossover_point] + schedule2[crossover_point:]
-    child2 = schedule2[:crossover_point] + schedule1[crossover_point:]
+    point = random.randint(1, len(schedule1) - 2)
+    child1 = schedule1[:point] + schedule2[point:]
+    child2 = schedule2[:point] + schedule1[point:]
     return child1, child2
 
-# mutating
-def mutate(schedule):
-    mutation_point = random.randint(0, len(schedule) - 1)
+
+def mutate(schedule, all_programs):
+    idx = random.randint(0, len(schedule) - 1)
     new_program = random.choice(all_programs)
-    schedule[mutation_point] = new_program
+    schedule[idx] = new_program
     return schedule
 
-# calling the fitness func.
-def evaluate_fitness(schedule):
-    return fitness_function(schedule)
 
-# genetic algorithms with parameters
-
-
-
-def genetic_algorithm(initial_schedule, generations=GEN, population_size=POP, crossover_rate=CO_R, mutation_rate=MUT_R, elitism_size=EL_S):
-
-    population = [initial_schedule]
-
-    for _ in range(population_size - 1):
-        random_schedule = initial_schedule.copy()
-        random.shuffle(random_schedule)
-        population.append(random_schedule)
+def genetic_algorithm(ratings, all_programs, generations, pop_size, crossover_rate, mutation_rate, elitism):
+    population = initialize_population(all_programs, pop_size)
+    best_fitness_history = []
 
     for generation in range(generations):
-        new_population = []
+        population.sort(key=lambda s: fitness_function(s, ratings), reverse=True)
+        new_pop = population[:elitism]
 
-        # Elitsm
-        population.sort(key=lambda schedule: fitness_function(schedule), reverse=True)
-        new_population.extend(population[:elitism_size])
-
-        while len(new_population) < population_size:
+        while len(new_pop) < pop_size:
             parent1, parent2 = random.choices(population, k=2)
+
             if random.random() < crossover_rate:
                 child1, child2 = crossover(parent1, parent2)
             else:
                 child1, child2 = parent1.copy(), parent2.copy()
 
             if random.random() < mutation_rate:
-                child1 = mutate(child1)
+                mutate(child1, all_programs)
             if random.random() < mutation_rate:
-                child2 = mutate(child2)
+                mutate(child2, all_programs)
 
-            new_population.extend([child1, child2])
+            new_pop.extend([child1, child2])
 
-        population = new_population
+        population = new_pop[:pop_size]
+        best_fitness_history.append(fitness_function(population[0], ratings))
 
-    return population[0]
+    best = max(population, key=lambda s: fitness_function(s, ratings))
+    return best, best_fitness_history
 
-##################################################### RESULTS ###################################################################################
 
-# brute force
-initial_best_schedule = finding_best_schedule(all_possible_schedules)
+# ===================== STREAMLIT INTERFACE =====================
 
-rem_t_slots = len(all_time_slots) - len(initial_best_schedule)
-genetic_schedule = genetic_algorithm(initial_best_schedule, generations=GEN, population_size=POP, elitism_size=EL_S)
+st.title("📺 Genetic Algorithm TV Schedule Optimizer")
 
-final_schedule = initial_best_schedule + genetic_schedule[:rem_t_slots]
+st.sidebar.header("⚙️ Genetic Algorithm Parameters")
 
-print("\nFinal Optimal Schedule:")
-for time_slot, program in enumerate(final_schedule):
-    print(f"Time Slot {all_time_slots[time_slot]:02d}:00 - Program {program}")
+file_path = "program_ratings_modified.csv"
+ratings = read_csv_to_dict(file_path)
 
-print("Total Ratings:", fitness_function(final_schedule))
+if ratings:
+    all_programs = list(ratings.keys())
+    all_time_slots = list(range(6, 6 + len(all_programs)))
+
+    # ===================== TRIAL 1 PARAMETERS =====================
+    st.sidebar.subheader("Trial 1 Parameters")
+    CO_R1 = st.sidebar.slider("Crossover Rate (Trial 1)", 0.0, 1.0, 0.8, step=0.05, key="co1")
+    MUT_R1 = st.sidebar.slider("Mutation Rate (Trial 1)", 0.0, 1.0, 0.2, step=0.01, key="mu1")
+
+    # ===================== TRIAL 2 PARAMETERS =====================
+    st.sidebar.subheader("Trial 2 Parameters")
+    CO_R2 = st.sidebar.slider("Crossover Rate (Trial 2)", 0.0, 1.0, 0.8, step=0.05, key="co2")
+    MUT_R2 = st.sidebar.slider("Mutation Rate (Trial 2)", 0.0, 1.0, 0.2, step=0.01, key="mu2")
+
+    # ===================== TRIAL 3 PARAMETERS =====================
+    st.sidebar.subheader("Trial 3 Parameters")
+    CO_R3 = st.sidebar.slider("Crossover Rate (Trial 3)", 0.0, 1.0, 0.8, step=0.05, key="co3")
+    MUT_R3 = st.sidebar.slider("Mutation Rate (Trial 3)", 0.0, 1.0, 0.2, step=0.01, key="mu3")
+
+    # Fixed GA parameters
+    GEN = 100
+    POP = 100
+    EL_S = 2
+
+    st.write("### Loaded Programs (Sample)")
+    sample_df = pd.DataFrame(list(ratings.items()), columns=["Program", "Ratings"]).head(5)
+    st.dataframe(sample_df)
+
+    if st.button("🚀 Run All 3 Trials"):
+        trial_settings = [
+            ("Trial 1", CO_R1, MUT_R1),
+            ("Trial 2", CO_R2, MUT_R2),
+            ("Trial 3", CO_R3, MUT_R3),
+        ]
+
+        results = []
+
+        with st.spinner("Running all 3 trials..."):
+            for name, co_rate, mut_rate in trial_settings:
+                best_schedule, fitness_history = genetic_algorithm(
+                    ratings, all_programs, GEN, POP, co_rate, mut_rate, EL_S
+                )
+                total_fitness = fitness_function(best_schedule, ratings)
+                results.append((name, co_rate, mut_rate, best_schedule, fitness_history, total_fitness))
+
+        # Display all trials
+        for name, co_rate, mut_rate, schedule, fitness_history, total_fit in results:
+            st.markdown(f"## 🧪 {name}")
+            st.write(f"**Crossover Rate:** {co_rate} | **Mutation Rate:** {mut_rate}")
+            st.metric(label="Total Fitness", value=round(total_fit, 2))
+
+            # Display schedule
+            schedule_data = []
+            for i, program in enumerate(schedule):
+                schedule_data.append({
+                    "Time Slot": f"{all_time_slots[i]:02d}:00",
+                    "Program": program,
+                    "Rating": round(ratings[program][i], 2) if i < len(ratings[program]) else "-"
+                })
+            st.dataframe(pd.DataFrame(schedule_data))
+
+            # Display fitness chart
+            st.line_chart(fitness_history)
+            st.divider()
