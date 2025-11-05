@@ -26,31 +26,25 @@ def read_csv_to_dict(uploaded_file):
 
 # ===================== STREAMLIT APP LAYOUT =====================
 st.title("🎬 TV Program Scheduling Optimizer (Genetic Algorithm)")
-st.write("Upload your CSV file and adjust genetic algorithm parameters to find the optimal program schedule.")
+st.write("Upload your CSV file and run multiple trials with different GA parameters to find the best schedule.")
 
 # ---- Upload CSV ----
 uploaded_file = st.file_uploader("📂 Upload your `program_ratings.csv` file", type="csv")
 
-# ---- Input Parameters ----
-st.sidebar.header("⚙️ Genetic Algorithm Parameters")
+# ---- Sidebar: 3 Trials ----
+st.sidebar.header("⚙️ GA Parameters for 3 Trials")
 
-CO_R = st.sidebar.slider(
-    "Crossover Rate (CO_R)", 
-    min_value=0.0, 
-    max_value=0.95, 
-    value=0.8, 
-    step=0.05, 
-    help="Controls how much crossover (mixing) happens between parents."
-)
+st.sidebar.markdown("### 🔹 Trial 1 Parameters")
+CO_R1 = st.sidebar.slider("Crossover Rate (Trial 1)", 0.0, 0.95, 0.8, 0.05)
+MUT_R1 = st.sidebar.slider("Mutation Rate (Trial 1)", 0.01, 0.05, 0.02, 0.01)
 
-MUT_R = st.sidebar.slider(
-    "Mutation Rate (MUT_R)", 
-    min_value=0.01, 
-    max_value=0.05, 
-    value=0.02, 
-    step=0.01, 
-    help="Controls how often random mutations occur in the population."
-)
+st.sidebar.markdown("### 🔹 Trial 2 Parameters")
+CO_R2 = st.sidebar.slider("Crossover Rate (Trial 2)", 0.0, 0.95, 0.6, 0.05)
+MUT_R2 = st.sidebar.slider("Mutation Rate (Trial 2)", 0.01, 0.05, 0.03, 0.01)
+
+st.sidebar.markdown("### 🔹 Trial 3 Parameters")
+CO_R3 = st.sidebar.slider("Crossover Rate (Trial 3)", 0.0, 0.95, 0.9, 0.05)
+MUT_R3 = st.sidebar.slider("Mutation Rate (Trial 3)", 0.01, 0.05, 0.05, 0.01)
 
 GEN = 100
 POP = 50
@@ -105,7 +99,7 @@ if uploaded_file is not None:
             schedule[mutation_point] = new_program
             return schedule
 
-        def genetic_algorithm(initial_schedule, generations=GEN, population_size=POP, crossover_rate=CO_R, mutation_rate=MUT_R, elitism_size=EL_S):
+        def genetic_algorithm(initial_schedule, generations, population_size, crossover_rate, mutation_rate, elitism_size):
             population = [initial_schedule]
             for _ in range(population_size - 1):
                 random_schedule = initial_schedule.copy()
@@ -131,28 +125,45 @@ if uploaded_file is not None:
                 population = new_population
             return population[0]
 
-        # ===================== STEP 3: RUN ALGORITHM =====================
-        if st.button("🚀 Run Optimization"):
-            st.info("Processing... Please wait while the genetic algorithm finds the optimal schedule.")
+        # ===================== STEP 3: RUN MULTIPLE TRIALS =====================
+        if st.button("🚀 Run All 3 Trials"):
+            st.info("Processing... Please wait while the algorithm runs 3 different trials.")
+
             all_possible_schedules = initialize_pop(all_programs, all_time_slots)
             initial_best_schedule = finding_best_schedule(all_possible_schedules)
             rem_t_slots = len(all_time_slots) - len(initial_best_schedule)
 
-            genetic_schedule = genetic_algorithm(initial_best_schedule)
-            final_schedule = initial_best_schedule + genetic_schedule[:rem_t_slots]
+            trials = [
+                {"name": "Trial 1", "CO_R": CO_R1, "MUT_R": MUT_R1},
+                {"name": "Trial 2", "CO_R": CO_R2, "MUT_R": MUT_R2},
+                {"name": "Trial 3", "CO_R": CO_R3, "MUT_R": MUT_R3},
+            ]
 
-            # ===================== STEP 4: DISPLAY RESULTS IN TABLE FORMAT =====================
-            st.subheader("📅 Final Optimal Schedule (Table Format)")
+            for trial in trials:
+                st.subheader(f"🧪 {trial['name']}")
+                st.write(f"**Crossover Rate (CO_R):** {trial['CO_R']}")
+                st.write(f"**Mutation Rate (MUT_R):** {trial['MUT_R']}")
 
-            schedule_data = pd.DataFrame({
-                "Time Slot": [f"{all_time_slots[i]:02d}:00" for i in range(len(final_schedule))],
-                "Program": final_schedule
-            })
+                genetic_schedule = genetic_algorithm(
+                    initial_best_schedule,
+                    generations=GEN,
+                    population_size=POP,
+                    crossover_rate=trial["CO_R"],
+                    mutation_rate=trial["MUT_R"],
+                    elitism_size=EL_S
+                )
+                final_schedule = initial_best_schedule + genetic_schedule[:rem_t_slots]
 
-            st.dataframe(schedule_data, use_container_width=True)
+                schedule_data = pd.DataFrame({
+                    "Time Slot": [f"{all_time_slots[i]:02d}:00" for i in range(len(final_schedule))],
+                    "Program": final_schedule
+                })
 
-            total_score = fitness_function(final_schedule)
-            st.success(f"🎯 Total Ratings: **{total_score:.2f}**")
+                total_score = fitness_function(final_schedule)
+
+                st.dataframe(schedule_data, use_container_width=True)
+                st.success(f"🎯 Total Ratings: **{total_score:.2f}**")
+                st.markdown("---")
 
     except Exception as e:
         st.error(f"❌ Error reading CSV file: {e}")
