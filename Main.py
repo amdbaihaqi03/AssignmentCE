@@ -25,7 +25,6 @@ else:
 
 ##################################### DEFINING PARAMETERS AND DATASET ################################################################
 # Sample rating programs dataset for each time slot.
-ratings = program_ratings_dict
 
 GEN = 100
 POP = 50
