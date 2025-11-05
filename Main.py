@@ -89,7 +89,7 @@ st.title("📺 Genetic Algorithm TV Schedule Optimizer")
 
 st.sidebar.header("⚙️ Genetic Algorithm Parameters")
 
-file_path = "program_ratings_modified.csv"
+file_path = "program_ratings.csv"
 ratings = read_csv_to_dict(file_path)
 
 if ratings:
