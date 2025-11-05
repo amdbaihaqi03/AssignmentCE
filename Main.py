@@ -1,4 +1,5 @@
 import csv
+import streamlit as st
 
 # Function to read the CSV file and convert it to the desired format
 def read_csv_to_dict(file_path):
@@ -16,20 +17,6 @@ def read_csv_to_dict(file_path):
 
     return program_ratings
 
-# Path to the CSV file
-file_path = "program_ratings.csv"
-data = pd.read_csv(file_path)
-st.success(f" Dataset loaded successfully from: {file_path}")
-
-# Get the data in the required format
-program_ratings_dict = read_csv_to_dict(file_path)
-
-# Print the result (you can also return or process it further)
-for program, ratings in program_ratings_dict.items():
-    print(f"'{program}': {ratings},")
-
-
-import random
 
 ##################################### DEFINING PARAMETERS AND DATASET ################################################################
 # Sample rating programs dataset for each time slot.
