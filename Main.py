@@ -21,9 +21,6 @@ if uploaded_file is not None:
 else:
     st.warning("Please upload the CSV file to continue.")
 
-# Print the result (you can also return or process it further)
-for program, ratings in program_ratings_dict.items():
-    print(f"'{program}': {ratings},")
 
 
 ##################################### DEFINING PARAMETERS AND DATASET ################################################################
