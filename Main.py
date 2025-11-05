@@ -23,29 +23,49 @@ def read_csv_to_dict(uploaded_file):
     return program_ratings
 
 
+# ===================== STREAMLIT APP LAYOUT =====================
 st.title("🎬 TV Program Scheduling Optimizer (Genetic Algorithm)")
-st.write("Upload your CSV file to generate the best schedule based on ratings.")
+st.write("Upload your CSV file and adjust algorithm parameters to find the best schedule.")
 
-uploaded_file = st.file_uploader("Upload your `program_ratings.csv` file", type="csv")
+# ---- Upload CSV ----
+uploaded_file = st.file_uploader("📂 Upload your `program_ratings.csv` file", type="csv")
 
+# ---- Input Parameters ----
+st.sidebar.header("⚙️ Genetic Algorithm Parameters")
+CO_R = st.sidebar.slider(
+    "Crossover Rate (CO_R)", 
+    min_value=0.0, 
+    max_value=0.95, 
+    value=0.8, 
+    step=0.05, 
+    help="Controls how much crossover (mixing) happens between parents."
+)
+
+MUT_R = st.sidebar.slider(
+    "Mutation Rate (MUT_R)", 
+    min_value=0.01, 
+    max_value=0.05, 
+    value=0.02, 
+    step=0.01, 
+    help="Controls how often random mutations occur in the population."
+)
+
+# Other fixed parameters
+GEN = 100
+POP = 50
+EL_S = 2
+
+# ===================== MAIN LOGIC =====================
 if uploaded_file is not None:
     try:
         program_ratings_dict = read_csv_to_dict(uploaded_file)
         st.success("✅ CSV file loaded successfully!")
 
-        # ===================== STEP 2: DEFINE PARAMETERS AND DATA =====================
         ratings = program_ratings_dict
+        all_programs = list(ratings.keys())
+        all_time_slots = list(range(6, 24))  # 6 AM to 11 PM
 
-        GEN = 100
-        POP = 50
-        CO_R = 0.8
-        MUT_R = 0.2
-        EL_S = 2
-
-        all_programs = list(ratings.keys())  # all programs
-        all_time_slots = list(range(6, 24))  # time slots (6 AM to 11 PM)
-
-        # ===================== STEP 3: DEFINE FUNCTIONS =====================
+        # ===================== STEP 2: DEFINE FUNCTIONS =====================
 
         def fitness_function(schedule):
             total_rating = 0
@@ -110,22 +130,25 @@ if uploaded_file is not None:
                 population = new_population
             return population[0]
 
-        # ===================== STEP 4: RUN ALGORITHM =====================
-        st.info("Processing... Please wait a moment for schedule optimization.")
+        # ===================== STEP 3: RUN ALGORITHM =====================
+        if st.button("🚀 Run Optimization"):
+            st.info("Processing... Please wait while the genetic algorithm finds the optimal schedule.")
+            all_possible_schedules = initialize_pop(all_programs, all_time_slots)
+            initial_best_schedule = finding_best_schedule(all_possible_schedules)
+            rem_t_slots = len(all_time_slots) - len(initial_best_schedule)
 
-        all_possible_schedules = initialize_pop(all_programs, all_time_slots)
-        initial_best_schedule = finding_best_schedule(all_possible_schedules)
-        rem_t_slots = len(all_time_slots) - len(initial_best_schedule)
+            genetic_schedule = genetic_algorithm(initial_best_schedule)
+            final_schedule = initial_best_schedule + genetic_schedule[:rem_t_slots]
 
-        genetic_schedule = genetic_algorithm(initial_best_schedule, generations=GEN, population_size=POP, elitism_size=EL_S)
-        final_schedule = initial_best_schedule + genetic_schedule[:rem_t_slots]
+            # ===================== STEP 4: DISPLAY RESULTS =====================
+            st.subheader("📅 Final Optimal Schedule")
+            schedule_data = {
+                "Time Slot": [f"{all_time_slots[i]:02d}:00" for i in range(len(final_schedule))],
+                "Program": final_schedule
+            }
+            st.dataframe(schedule_data, use_container_width=True)
 
-        # ===================== STEP 5: DISPLAY RESULTS =====================
-        st.subheader("📅 Final Optimal Schedule")
-        for time_slot, program in enumerate(final_schedule):
-            st.write(f"**Time Slot {all_time_slots[time_slot]:02d}:00** → {program}")
-
-        st.success(f"🎯 Total Ratings: **{fitness_function(final_schedule):.2f}**")
+            st.success(f"🎯 Total Ratings: **{fitness_function(final_schedule):.2f}**")
 
     except Exception as e:
         st.error(f"❌ Error reading CSV file: {e}")
