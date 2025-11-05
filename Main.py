@@ -16,7 +16,7 @@ def read_csv_to_dict(file_path):
                 ratings = [float(x) if x else 0.0 for x in row[1:]]
                 program_ratings[program] = ratings
     except FileNotFoundError:
-        st.error("❌ File 'program_ratings_modified.csv' not found. Please make sure it’s in the same folder as this app.")
+        st.error("❌ File 'program_ratings.csv' not found. Please make sure it’s in the same folder as this app.")
     return program_ratings
 
 
