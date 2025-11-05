@@ -2,6 +2,7 @@ import streamlit as st
 import csv
 import io
 import random
+import pandas as pd
 
 # ===================== STEP 1: READ CSV USING STREAMLIT UPLOADER =====================
 
@@ -25,13 +26,14 @@ def read_csv_to_dict(uploaded_file):
 
 # ===================== STREAMLIT APP LAYOUT =====================
 st.title("🎬 TV Program Scheduling Optimizer (Genetic Algorithm)")
-st.write("Upload your CSV file and adjust algorithm parameters to find the best schedule.")
+st.write("Upload your CSV file and adjust genetic algorithm parameters to find the optimal program schedule.")
 
 # ---- Upload CSV ----
 uploaded_file = st.file_uploader("📂 Upload your `program_ratings.csv` file", type="csv")
 
 # ---- Input Parameters ----
 st.sidebar.header("⚙️ Genetic Algorithm Parameters")
+
 CO_R = st.sidebar.slider(
     "Crossover Rate (CO_R)", 
     min_value=0.0, 
@@ -50,7 +52,6 @@ MUT_R = st.sidebar.slider(
     help="Controls how often random mutations occur in the population."
 )
 
-# Other fixed parameters
 GEN = 100
 POP = 50
 EL_S = 2
@@ -140,15 +141,18 @@ if uploaded_file is not None:
             genetic_schedule = genetic_algorithm(initial_best_schedule)
             final_schedule = initial_best_schedule + genetic_schedule[:rem_t_slots]
 
-            # ===================== STEP 4: DISPLAY RESULTS =====================
-            st.subheader("📅 Final Optimal Schedule")
-            schedule_data = {
+            # ===================== STEP 4: DISPLAY RESULTS IN TABLE FORMAT =====================
+            st.subheader("📅 Final Optimal Schedule (Table Format)")
+
+            schedule_data = pd.DataFrame({
                 "Time Slot": [f"{all_time_slots[i]:02d}:00" for i in range(len(final_schedule))],
                 "Program": final_schedule
-            }
+            })
+
             st.dataframe(schedule_data, use_container_width=True)
 
-            st.success(f"🎯 Total Ratings: **{fitness_function(final_schedule):.2f}**")
+            total_score = fitness_function(final_schedule)
+            st.success(f"🎯 Total Ratings: **{total_score:.2f}**")
 
     except Exception as e:
         st.error(f"❌ Error reading CSV file: {e}")
