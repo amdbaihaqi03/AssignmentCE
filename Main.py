@@ -2,6 +2,7 @@ import csv
 import numpy as np
 import pandas as pd
 import streamlit as st
+import random
 
 # Function to read the CSV file and convert it to the desired format
 def read_csv_to_dict(file_path):
@@ -29,8 +30,6 @@ program_ratings_dict = read_csv_to_dict(file_path)
 for program, ratings in program_ratings_dict.items():
     print(f"'{program}': {ratings},")
 
-
-import random
 
 ##################################### DEFINING PARAMETERS AND DATASET ################################################################
 # Sample rating programs dataset for each time slot.
