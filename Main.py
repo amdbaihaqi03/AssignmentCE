@@ -1,6 +1,8 @@
 import csv
 import streamlit as st
 
+
+uploaded_file = st.file_uploader("Upload your CSV file", type=['csv'])
 # Function to read the CSV file and convert it to the desired format
 def read_csv_to_dict(file):
     program_ratings = {}
